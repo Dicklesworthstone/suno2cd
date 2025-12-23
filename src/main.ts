@@ -36,8 +36,9 @@ interface TouchState {
   currentX: number;
   element: HTMLElement | null;
   index: number;
+  hapticTriggered: boolean;
 }
-let touchState: TouchState = { startX: 0, startY: 0, currentX: 0, element: null, index: -1 };
+let touchState: TouchState = { startX: 0, startY: 0, currentX: 0, element: null, index: -1, hapticTriggered: false };
 
 // Haptic feedback utility
 function haptic(type: 'light' | 'medium' | 'heavy' | 'success' | 'error' = 'light') {
@@ -224,6 +225,7 @@ function handleTouchStart(e: TouchEvent) {
     currentX: touch.clientX,
     element: target,
     index: parseInt(target.dataset.index || '-1', 10),
+    hapticTriggered: false,
   };
 }
 
@@ -249,7 +251,9 @@ function handleTouchMove(e: TouchEvent) {
     touchState.element.style.transform = `translateX(${offset}px)`;
     touchState.element.style.opacity = String(1 + offset / 200);
 
-    if (offset < -60) {
+    // Only trigger haptic once when threshold is crossed
+    if (offset < -60 && !touchState.hapticTriggered) {
+      touchState.hapticTriggered = true;
       haptic('light');
     }
   }
@@ -272,7 +276,7 @@ function handleTouchEnd() {
     touchState.element.style.opacity = '';
   }
 
-  touchState = { startX: 0, startY: 0, currentX: 0, element: null, index: -1 };
+  touchState = { startX: 0, startY: 0, currentX: 0, element: null, index: -1, hapticTriggered: false };
 }
 
 function removeFile(index: number, element?: HTMLElement) {
@@ -315,7 +319,8 @@ async function startConversion() {
   try {
     if (!ffmpegLoaded) {
       await loadFFmpeg((progress, message) => {
-        updateProgress(progress, message, 'First-time download (~31 MB)');
+        // Scale FFmpeg download progress to 0-30% of overall progress
+        updateProgress(progress * 0.3, message, 'First-time download (~31 MB)');
       });
       ffmpegLoaded = true;
     }
