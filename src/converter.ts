@@ -26,14 +26,13 @@ export function checkBrowserSupport(): { supported: boolean; message: string; ne
   }
 
   // Service worker may be loading - will auto-reload when ready
-  // Check if we're on a localhost or file:// where it might work differently
   const isLocalhost = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
   const isFile = location.protocol === 'file:';
 
   if (isLocalhost || isFile) {
     return {
       supported: false,
-      message: 'SharedArrayBuffer requires specific server headers. Try running with: npx vite --host',
+      message: 'SharedArrayBuffer requires specific server headers. Try running with: bunx vite --host',
     };
   }
 
@@ -61,11 +60,55 @@ export async function loadFFmpeg(onProgress?: ProgressCallback): Promise<void> {
 
   onProgress?.(0, 'Downloading FFmpeg core...');
 
-  const baseURL = 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/esm';
+  // Use jsDelivr (faster/more reliable than unpkg) with version matching @ffmpeg/ffmpeg
+  const baseURL = 'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.10/dist/esm';
+
+  // Track download progress for both files
+  const downloadState = {
+    core: { received: 0, total: 0 },
+    wasm: { received: 0, total: 0 },
+  };
+
+  const updateProgress = () => {
+    const totalBytes = downloadState.core.total + downloadState.wasm.total;
+    const receivedBytes = downloadState.core.received + downloadState.wasm.received;
+
+    if (totalBytes > 0) {
+      const percent = (receivedBytes / totalBytes) * 100;
+      const receivedMB = (receivedBytes / 1024 / 1024).toFixed(1);
+      const totalMB = (totalBytes / 1024 / 1024).toFixed(1);
+      onProgress?.(percent, `Downloading: ${receivedMB} / ${totalMB} MB`);
+    }
+  };
+
+  // Download both files with progress tracking
+  const coreURL = await toBlobURL(
+    `${baseURL}/ffmpeg-core.js`,
+    'text/javascript',
+    true,
+    (event) => {
+      downloadState.core.received = event.received;
+      downloadState.core.total = event.total;
+      updateProgress();
+    }
+  );
+
+  const wasmURL = await toBlobURL(
+    `${baseURL}/ffmpeg-core.wasm`,
+    'application/wasm',
+    true,
+    (event) => {
+      downloadState.wasm.received = event.received;
+      downloadState.wasm.total = event.total;
+      updateProgress();
+    }
+  );
+
+  onProgress?.(100, 'Initializing FFmpeg...');
 
   await ffmpeg.load({
-    coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, 'text/javascript'),
-    wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, 'application/wasm'),
+    coreURL,
+    wasmURL,
   });
 
   loaded = true;
@@ -78,6 +121,30 @@ export interface ConversionResult {
   originalName: string;
 }
 
+// Track used names to handle duplicates
+const usedOutputNames = new Map<string, number>();
+
+function getUniqueFilename(desiredName: string): string {
+  const count = usedOutputNames.get(desiredName) ?? 0;
+
+  if (count === 0) {
+    usedOutputNames.set(desiredName, 1);
+    return desiredName;
+  }
+
+  // Insert " (n)" before extension
+  const lastDot = desiredName.lastIndexOf('.');
+  const base = lastDot >= 0 ? desiredName.slice(0, lastDot) : desiredName;
+  const ext = lastDot >= 0 ? desiredName.slice(lastDot) : '';
+
+  usedOutputNames.set(desiredName, count + 1);
+  return `${base} (${count + 1})${ext}`;
+}
+
+export function resetFilenameTracking(): void {
+  usedOutputNames.clear();
+}
+
 export async function convertToCDQuality(
   file: File,
   onProgress?: ProgressCallback
@@ -88,10 +155,14 @@ export async function convertToCDQuality(
 
   // Use unique counter to prevent filename collisions in ffmpeg's virtual filesystem
   const uniqueId = ++fileCounter;
-  const inputName = `input_${uniqueId}_${file.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
+  const inputExt = file.name.includes('.') ? file.name.slice(file.name.lastIndexOf('.')) : '';
+  const inputName = `input_${uniqueId}${inputExt}`;
   const outputName = `output_${uniqueId}.wav`;
+
+  // Generate unique display filename
   const baseName = file.name.replace(/\.[^/.]+$/, '');
-  const displayName = `${baseName}.wav`;
+  const desiredDisplayName = `${baseName}.wav`;
+  const displayName = getUniqueFilename(desiredDisplayName);
 
   onProgress?.(10, `Loading ${file.name}...`);
   await ffmpeg.writeFile(inputName, await fetchFile(file));
@@ -108,20 +179,32 @@ export async function convertToCDQuality(
   ffmpeg.on('progress', progressHandler);
 
   try {
-    onProgress?.(15, 'Converting to 44.1kHz 16-bit WAV...');
+    onProgress?.(15, 'Converting to 44.1kHz 16-bit stereo WAV...');
 
-    await ffmpeg.exec([
+    // Convert to CD-quality WAV:
+    //  -ar 44100      -> resample to 44.1kHz
+    //  -ac 2          -> force stereo output
+    //  -sample_fmt s16 -> 16-bit samples
+    //  -c:a pcm_s16le -> 16-bit PCM little-endian
+    const exitCode = await ffmpeg.exec([
       '-i', inputName,
       '-ar', '44100',
+      '-ac', '2',
       '-sample_fmt', 's16',
       '-c:a', 'pcm_s16le',
       '-y',
       outputName
     ]);
 
+    // Check exit code (0 = success)
+    if (exitCode !== 0) {
+      throw new Error(`FFmpeg failed for "${file.name}" (exit code: ${exitCode})`);
+    }
+
     onProgress?.(90, 'Reading output...');
     const data = await ffmpeg.readFile(outputName);
 
+    // Clean up to reduce memory usage
     await ffmpeg.deleteFile(inputName);
     await ffmpeg.deleteFile(outputName);
 
@@ -132,6 +215,7 @@ export async function convertToCDQuality(
       ? new TextEncoder().encode(data)
       : new Uint8Array(data);
     const blob = new Blob([blobData], { type: 'audio/wav' });
+
     return {
       blob,
       filename: displayName,
@@ -146,4 +230,16 @@ export function isAudioFile(file: File): boolean {
   const audioExtensions = ['.mp3', '.wav', '.flac', '.ogg', '.m4a', '.aac', '.wma', '.aiff'];
   const ext = file.name.toLowerCase().slice(file.name.lastIndexOf('.'));
   return file.type.startsWith('audio/') || audioExtensions.includes(ext);
+}
+
+// Format bytes to human readable
+export function formatBytes(bytes: number): string {
+  const units = ['B', 'KB', 'MB', 'GB'];
+  let n = bytes;
+  let i = 0;
+  while (n >= 1024 && i < units.length - 1) {
+    n /= 1024;
+    i++;
+  }
+  return `${n.toFixed(i === 0 ? 0 : 1)} ${units[i]}`;
 }

@@ -1,4 +1,11 @@
-import { loadFFmpeg, convertToCDQuality, isAudioFile, ConversionResult, checkBrowserSupport } from './converter';
+import { loadFFmpeg, convertToCDQuality, isAudioFile, ConversionResult, checkBrowserSupport, resetFilenameTracking, formatBytes } from './converter';
+
+// Declare JSZip on window (loaded from CDN)
+declare global {
+  interface Window {
+    JSZip?: any;
+  }
+}
 
 // DOM Elements
 const dropZone = document.getElementById('dropZone')!;
@@ -181,7 +188,7 @@ function renderFileList() {
       </div>
       <div class="min-w-0 flex-1">
         <p class="text-sm sm:text-base font-medium text-white truncate">${escapeHtml(file.name)}</p>
-        <p class="text-xs sm:text-sm text-gray-500 mt-0.5">${formatSize(file.size)}</p>
+        <p class="text-xs sm:text-sm text-gray-500 mt-0.5">${formatBytes(file.size)}</p>
       </div>
       <button class="remove-btn w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-white/5 hover:bg-red-500/20 active:bg-red-500/30 flex items-center justify-center transition-colors group flex-shrink-0 focus-ring" data-index="${index}" aria-label="Remove file">
         <svg class="w-4 h-4 sm:w-5 sm:h-5 text-gray-500 group-hover:text-red-400 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
@@ -302,10 +309,13 @@ async function startConversion() {
   status.classList.remove('hidden');
   updateProgress(0, 'Initializing FFmpeg...', 'Loading audio processing engine');
 
+  // Reset filename tracking for this batch
+  resetFilenameTracking();
+
   try {
     if (!ffmpegLoaded) {
       await loadFFmpeg((progress, message) => {
-        updateProgress(progress * 0.3, message, 'Downloading FFmpeg core (~30MB)');
+        updateProgress(progress, message, 'First-time download (~31 MB)');
       });
       ffmpegLoaded = true;
     }
@@ -395,7 +405,7 @@ function showResults(convertedFiles: ConversionResult[]) {
       </div>
       <div class="min-w-0 flex-1">
         <p class="text-sm sm:text-base font-medium text-white truncate">${escapeHtml(file.filename)}</p>
-        <p class="text-xs sm:text-sm text-gray-500 mt-0.5">${formatSize(file.blob.size)} &bull; 44.1kHz &bull; 16-bit</p>
+        <p class="text-xs sm:text-sm text-gray-500 mt-0.5">${formatBytes(file.blob.size)} &bull; 44.1kHz &bull; 16-bit</p>
       </div>
       <a href="${url}" download="${escapeHtml(file.filename)}" class="btn-success px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl text-sm font-semibold text-white flex items-center gap-2 flex-shrink-0 focus-ring" onclick="this.blur()">
         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
@@ -411,29 +421,69 @@ function showResults(convertedFiles: ConversionResult[]) {
     resultItems.appendChild(item);
   });
 
-  // Download All button (only if multiple files)
+  // Download All as ZIP button (only if multiple files)
   if (fileUrls.length > 1) {
-    const downloadAllBtn = document.createElement('button');
-    downloadAllBtn.className = 'result-item w-full mt-3 sm:mt-4 btn-success py-3.5 sm:py-4 rounded-xl sm:rounded-2xl font-semibold text-sm sm:text-base flex items-center justify-center gap-2 focus-ring';
-    downloadAllBtn.style.animationDelay = `${fileUrls.length * 80}ms`;
-    downloadAllBtn.innerHTML = `
+    const downloadZipBtn = document.createElement('button');
+    downloadZipBtn.className = 'result-item w-full mt-3 sm:mt-4 btn-success py-3.5 sm:py-4 rounded-xl sm:rounded-2xl font-semibold text-sm sm:text-base flex items-center justify-center gap-2 focus-ring';
+    downloadZipBtn.style.animationDelay = `${fileUrls.length * 80}ms`;
+    downloadZipBtn.innerHTML = `
       <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
         <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
       </svg>
-      Download All (${fileUrls.length} files)
+      Download All as ZIP (${fileUrls.length} files)
     `;
-    downloadAllBtn.addEventListener('click', () => {
+    downloadZipBtn.addEventListener('click', async () => {
       haptic('medium');
-      fileUrls.forEach(({ file, url }, i) => {
-        setTimeout(() => {
-          const a = document.createElement('a');
-          a.href = url;
-          a.download = file.filename;
-          a.click();
-        }, i * 150);
-      });
+
+      if (!window.JSZip) {
+        showToast('ZIP library not loaded', 'error');
+        // Fallback to individual downloads
+        fileUrls.forEach(({ file, url }, i) => {
+          setTimeout(() => {
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = file.filename;
+            a.click();
+          }, i * 150);
+        });
+        return;
+      }
+
+      // Disable button while creating ZIP
+      downloadZipBtn.disabled = true;
+      const originalText = downloadZipBtn.innerHTML;
+      downloadZipBtn.innerHTML = `
+        <div class="spinner" style="width: 20px; height: 20px; border-width: 2px;"></div>
+        <span>Creating ZIP...</span>
+      `;
+
+      try {
+        const zip = new window.JSZip();
+
+        for (const { file } of fileUrls) {
+          zip.file(file.filename, file.blob);
+        }
+
+        const zipBlob = await zip.generateAsync({ type: 'blob' });
+        const zipUrl = URL.createObjectURL(zipBlob);
+
+        const a = document.createElement('a');
+        a.href = zipUrl;
+        a.download = 'cd-quality-wavs.zip';
+        a.click();
+
+        URL.revokeObjectURL(zipUrl);
+        haptic('success');
+        showToast('ZIP downloaded!');
+      } catch (err) {
+        console.error('ZIP creation failed:', err);
+        showToast('ZIP creation failed', 'error');
+      } finally {
+        downloadZipBtn.disabled = false;
+        downloadZipBtn.innerHTML = originalText;
+      }
     });
-    resultItems.appendChild(downloadAllBtn);
+    resultItems.appendChild(downloadZipBtn);
   }
 
   // Convert More button
@@ -487,8 +537,4 @@ function escapeHtml(str: string): string {
     .replace(/'/g, '&#39;');
 }
 
-function formatSize(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-}
+// Use formatBytes from converter.ts (imported at top)
