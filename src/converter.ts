@@ -58,50 +58,23 @@ export async function loadFFmpeg(onProgress?: ProgressCallback): Promise<void> {
     console.log('[FFmpeg]', message);
   });
 
-  onProgress?.(0, 'Downloading FFmpeg core...');
+  onProgress?.(0, 'Downloading FFmpeg (~31 MB)...');
 
   // Use jsDelivr (faster/more reliable than unpkg) with version matching @ffmpeg/ffmpeg
   const baseURL = 'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.10/dist/esm';
 
-  // Track download progress for both files
-  const downloadState = {
-    core: { received: 0, total: 0 },
-    wasm: { received: 0, total: 0 },
-  };
-
-  const updateProgress = () => {
-    const totalBytes = downloadState.core.total + downloadState.wasm.total;
-    const receivedBytes = downloadState.core.received + downloadState.wasm.received;
-
-    if (totalBytes > 0) {
-      const percent = (receivedBytes / totalBytes) * 100;
-      const receivedMB = (receivedBytes / 1024 / 1024).toFixed(1);
-      const totalMB = (totalBytes / 1024 / 1024).toFixed(1);
-      onProgress?.(percent, `Downloading: ${receivedMB} / ${totalMB} MB`);
-    }
-  };
-
-  // Download both files with progress tracking
+  // Download core JS file
+  onProgress?.(10, 'Downloading FFmpeg core...');
   const coreURL = await toBlobURL(
     `${baseURL}/ffmpeg-core.js`,
-    'text/javascript',
-    true,
-    (event) => {
-      downloadState.core.received = event.received;
-      downloadState.core.total = event.total;
-      updateProgress();
-    }
+    'text/javascript'
   );
 
+  // Download WASM file (the large one)
+  onProgress?.(30, 'Downloading FFmpeg WASM (~31 MB)...');
   const wasmURL = await toBlobURL(
     `${baseURL}/ffmpeg-core.wasm`,
-    'application/wasm',
-    true,
-    (event) => {
-      downloadState.wasm.received = event.received;
-      downloadState.wasm.total = event.total;
-      updateProgress();
-    }
+    'application/wasm'
   );
 
   onProgress?.(100, 'Initializing FFmpeg...');
