@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="Convert Suno exports (48kHz MP3/WAV) into CD-quality 44.1kHz 16-bit WAV entirely in your browser." />
+    <title>Suno → CD-Quality WAV (44.1kHz / 16‑bit)</title>
+
+    <!-- Tailwind v4 Play CDN (no build step for CSS) -->
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+
+    <!-- FilePond (nice drag-and-drop file picker) -->
+    <link href="https://unpkg.com/filepond/dist/filepond.min.css" rel="stylesheet" />
+  </head>
+
+  <body class="min-h-screen bg-zinc-50 text-zinc-900">
+    <main class="mx-auto w-full max-w-3xl p-6">
+      <header class="mb-6">
+        <h1 class="text-2xl font-semibold tracking-tight">Suno → CD‑Quality WAV</h1>
+        <p class="mt-2 text-sm text-zinc-600">
+          Converts Suno exports (often <span class="font-medium">48kHz</span> MP3/WAV) into
+          <span class="font-semibold">44.1kHz, 16‑bit, stereo WAV</span> — entirely in your browser.
+          <span class="font-medium">No uploads.</span>
+        </p>
+      </header>
+
+      <section class="space-y-4">
+        <!-- Step 1: Load ffmpeg.wasm -->
+        <div class="rounded-xl border bg-white p-4 shadow-sm">
+          <div class="flex flex-col gap-3 sm:flex-row sm:items-center">
+            <button
+              id="loadBtn"
+              class="inline-flex items-center justify-center rounded-lg bg-black px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
+              type="button"
+            >
+              Load converter (~31 MB)
+            </button>
+
+            <div class="flex-1">
+              <div class="h-2 w-full overflow-hidden rounded-full bg-zinc-200">
+                <div id="loadBar" class="h-2 w-0 rounded-full bg-black"></div>
+              </div>
+              <p id="loadStatus" class="mt-2 text-xs text-zinc-600">Not loaded.</p>
+            </div>
+          </div>
+
+          <p class="mt-3 text-xs text-zinc-500">
+            Tip: the first load downloads the FFmpeg core (WASM) and caches it in your browser cache.
+          </p>
+        </div>
+
+        <!-- Step 2: Pick files + convert -->
+        <div class="rounded-xl border bg-white p-4 shadow-sm">
+          <div class="flex items-center justify-between gap-3">
+            <h2 class="text-sm font-semibold">1) Choose audio files</h2>
+            <span id="fileCount" class="text-xs text-zinc-500">0 selected</span>
+          </div>
+
+          <div class="mt-3">
+            <input id="fileInput" type="file" multiple accept="audio/*,.mp3,.wav" />
+          </div>
+
+          <div class="mt-4 flex flex-wrap gap-2">
+            <button
+              id="convertBtn"
+              class="inline-flex items-center justify-center rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
+              type="button"
+              disabled
+            >
+              Convert to CD-quality WAV
+            </button>
+
+            <button
+              id="clearBtn"
+              class="inline-flex items-center justify-center rounded-lg border border-zinc-300 bg-white px-4 py-2 text-sm font-semibold hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-40"
+              type="button"
+              disabled
+            >
+              Clear
+            </button>
+          </div>
+
+          <div class="mt-4">
+            <div class="h-2 w-full overflow-hidden rounded-full bg-zinc-200">
+              <div id="taskBar" class="h-2 w-0 rounded-full bg-blue-600"></div>
+            </div>
+            <p id="taskStatus" class="mt-2 text-xs text-zinc-600">No job running.</p>
+          </div>
+
+          <details class="mt-4 text-xs text-zinc-600">
+            <summary class="cursor-pointer select-none font-medium">What exactly will it output?</summary>
+            <ul class="mt-2 list-disc space-y-1 pl-5">
+              <li>Container: <span class="font-medium">WAV</span></li>
+              <li>Codec: <span class="font-medium">PCM 16-bit (pcm_s16le)</span></li>
+              <li>Sample rate: <span class="font-medium">44,100 Hz</span></li>
+              <li>Channels: <span class="font-medium">stereo (2)</span></li>
+            </ul>
+          </details>
+        </div>
+
+        <!-- Results -->
+        <div class="rounded-xl border bg-white p-4 shadow-sm">
+          <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <h2 class="text-sm font-semibold">2) Download</h2>
+
+            <button
+              id="downloadZipBtn"
+              class="inline-flex items-center justify-center rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm font-semibold hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-40"
+              type="button"
+              disabled
+              title="Zips all converted WAV files into one download"
+            >
+              Download all as .zip
+            </button>
+          </div>
+
+          <div id="results" class="mt-3 space-y-3"></div>
+
+          <p class="mt-4 text-xs text-zinc-500">
+            Everything runs locally in your browser. Your audio never leaves your machine.
+          </p>
+        </div>
+
+        <footer class="pt-2 text-xs text-zinc-500">
+          Built with <span class="font-medium">ffmpeg.wasm</span> (WebAssembly) + Vite. Hosted as a static site (works on GitHub Pages).
+        </footer>
+      </section>
+    </main>
+
+    <!-- FilePond (CDN) -->
+    <script src="https://unpkg.com/filepond/dist/filepond.min.js"></script>
+    <script src="https://unpkg.com/filepond-plugin-file-validate-type/dist/filepond-plugin-file-validate-type.min.js"></script>
+
+    <!-- JSZip (CDN) for "download all" -->
+    <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

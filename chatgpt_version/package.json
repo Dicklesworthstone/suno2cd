@@ -1,0 +1,23 @@
+{
+  "name": "suno-cd-quality-converter",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "description": "Convert Suno exports (48kHz MP3/WAV) into CD-quality 44.1kHz 16-bit WAV entirely in the browser (ffmpeg.wasm).",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@ffmpeg/ffmpeg": "0.12.15",
+    "@ffmpeg/util": "0.12.2"
+  },
+  "devDependencies": {
+    "typescript": "^5.0.0",
+    "vite": "^5.0.0"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

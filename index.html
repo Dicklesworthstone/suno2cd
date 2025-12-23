@@ -2,11 +2,17 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+  <meta name="theme-color" content="#0a0a0f">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <title>Suno2CD - Convert to CD Quality</title>
   <meta name="description" content="Convert Suno AI audio files to CD quality (44.1kHz 16-bit WAV) directly in your browser. No uploads, completely private.">
 
-  <!-- Service worker for COOP/COEP headers (required for SharedArrayBuffer on GitHub Pages) -->
+  <!-- Favicons -->
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎵</text></svg>">
+
+  <!-- Service worker for COOP/COEP headers -->
   <script src="https://unpkg.com/coi-serviceworker@0.1.7/coi-serviceworker.min.js"></script>
 
   <!-- Tailwind CSS -->
@@ -16,38 +22,61 @@
       theme: {
         extend: {
           fontFamily: {
-            sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
+            sans: ['Inter var', 'Inter', 'system-ui', '-apple-system', 'sans-serif'],
           },
-          animation: {
-            'gradient': 'gradient 8s ease infinite',
-            'float': 'float 6s ease-in-out infinite',
-            'pulse-slow': 'pulse 3s ease-in-out infinite',
-            'shimmer': 'shimmer 2s linear infinite',
-            'bounce-subtle': 'bounce-subtle 2s ease-in-out infinite',
+          screens: {
+            'xs': '375px',
+            'touch': { 'raw': '(hover: none) and (pointer: coarse)' },
           },
+          spacing: {
+            'safe-top': 'env(safe-area-inset-top)',
+            'safe-bottom': 'env(safe-area-inset-bottom)',
+            'safe-left': 'env(safe-area-inset-left)',
+            'safe-right': 'env(safe-area-inset-right)',
+          }
         }
       }
     }
   </script>
 
-  <!-- Inter Font -->
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <!-- Inter Font with variable weight -->
+  <link rel="preconnect" href="https://rsms.me/">
+  <link rel="stylesheet" href="https://rsms.me/inter/inter.css">
 
   <style>
-    * {
-      font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    :root {
+      --purple-glow: rgba(139, 92, 246, 0.15);
+      --pink-glow: rgba(236, 72, 153, 0.12);
+      --safe-bottom: env(safe-area-inset-bottom, 0px);
+      color-scheme: dark;
     }
 
-    @keyframes gradient {
-      0%, 100% { background-position: 0% 50%; }
-      50% { background-position: 100% 50%; }
+    html {
+      font-family: 'Inter var', 'Inter', system-ui, -apple-system, sans-serif;
+      font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+      -webkit-tap-highlight-color: transparent;
+      touch-action: manipulation;
     }
 
+    body {
+      overscroll-behavior: none;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    /* Smooth scrolling with momentum */
+    .scroll-container {
+      -webkit-overflow-scrolling: touch;
+      scroll-behavior: smooth;
+      overscroll-behavior-y: contain;
+    }
+
+    /* Animations */
     @keyframes float {
-      0%, 100% { transform: translateY(0px); }
-      50% { transform: translateY(-20px); }
+      0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
+      33% { transform: translate3d(10px, -15px, 0) scale(1.02); }
+      66% { transform: translate3d(-5px, 10px, 0) scale(0.98); }
     }
 
     @keyframes shimmer {
@@ -55,379 +84,521 @@
       100% { background-position: 200% 0; }
     }
 
-    @keyframes bounce-subtle {
-      0%, 100% { transform: translateY(0); }
-      50% { transform: translateY(-5px); }
+    @keyframes pulse-subtle {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.7; }
     }
 
-    @keyframes pulse-ring {
-      0% { transform: scale(0.95); opacity: 1; }
-      100% { transform: scale(1.3); opacity: 0; }
-    }
-
-    @keyframes spin-slow {
-      from { transform: rotate(0deg); }
+    @keyframes spin {
       to { transform: rotate(360deg); }
     }
 
-    .bg-grid {
-      background-image:
-        linear-gradient(rgba(139, 92, 246, 0.03) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(139, 92, 246, 0.03) 1px, transparent 1px);
-      background-size: 60px 60px;
+    @keyframes slide-up {
+      from { opacity: 0; transform: translate3d(0, 20px, 0); }
+      to { opacity: 1; transform: translate3d(0, 0, 0); }
     }
 
-    .glass {
-      background: rgba(255, 255, 255, 0.03);
-      backdrop-filter: blur(20px);
-      -webkit-backdrop-filter: blur(20px);
-      border: 1px solid rgba(255, 255, 255, 0.08);
+    @keyframes slide-in-right {
+      from { opacity: 0; transform: translate3d(30px, 0, 0); }
+      to { opacity: 1; transform: translate3d(0, 0, 0); }
     }
 
-    .glass-strong {
-      background: rgba(255, 255, 255, 0.05);
-      backdrop-filter: blur(40px);
-      -webkit-backdrop-filter: blur(40px);
-      border: 1px solid rgba(255, 255, 255, 0.1);
+    @keyframes scale-in {
+      from { opacity: 0; transform: scale(0.95); }
+      to { opacity: 1; transform: scale(1); }
     }
 
-    .gradient-text {
-      background: linear-gradient(135deg, #a78bfa 0%, #f472b6 50%, #fb923c 100%);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      background-clip: text;
+    @keyframes bounce-in {
+      0% { transform: scale(0.3); opacity: 0; }
+      50% { transform: scale(1.05); }
+      70% { transform: scale(0.9); }
+      100% { transform: scale(1); opacity: 1; }
     }
 
-    .gradient-border {
-      position: relative;
-      background: linear-gradient(135deg, rgba(167, 139, 250, 0.2), rgba(244, 114, 182, 0.2));
-      border-radius: 1.5rem;
+    @keyframes check-draw {
+      to { stroke-dashoffset: 0; }
     }
 
-    .gradient-border::before {
-      content: '';
-      position: absolute;
-      inset: 0;
-      border-radius: 1.5rem;
-      padding: 1px;
-      background: linear-gradient(135deg, rgba(167, 139, 250, 0.5), rgba(244, 114, 182, 0.5));
-      -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-      -webkit-mask-composite: xor;
-      mask-composite: exclude;
-      pointer-events: none;
+    @keyframes ripple {
+      to { transform: scale(2.5); opacity: 0; }
     }
 
-    .drop-zone {
-      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    }
-
-    .drop-zone:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 20px 40px -15px rgba(139, 92, 246, 0.3);
-    }
-
-    .drop-zone.dragover {
-      transform: scale(1.02);
-      border-color: rgba(167, 139, 250, 0.8);
-      box-shadow:
-        0 0 0 4px rgba(167, 139, 250, 0.1),
-        0 25px 50px -12px rgba(139, 92, 246, 0.4);
-    }
-
-    .drop-zone.dragover .drop-icon {
-      animation: bounce-subtle 0.5s ease-in-out infinite;
-    }
-
-    .btn-primary {
-      background: linear-gradient(135deg, #8b5cf6 0%, #a855f7 50%, #d946ef 100%);
-      background-size: 200% 200%;
-      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-      box-shadow: 0 10px 30px -10px rgba(139, 92, 246, 0.5);
-    }
-
-    .btn-primary:hover {
-      background-position: 100% 100%;
-      transform: translateY(-2px);
-      box-shadow: 0 15px 40px -10px rgba(139, 92, 246, 0.6);
-    }
-
-    .btn-primary:active {
-      transform: translateY(0);
-    }
-
-    .btn-success {
-      background: linear-gradient(135deg, #10b981 0%, #34d399 100%);
-      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-      box-shadow: 0 10px 30px -10px rgba(16, 185, 129, 0.5);
-    }
-
-    .btn-success:hover {
-      transform: translateY(-1px);
-      box-shadow: 0 15px 40px -10px rgba(16, 185, 129, 0.6);
-    }
-
-    .file-item {
-      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-    }
-
-    .file-item:hover {
-      transform: translateX(4px);
-      background: rgba(139, 92, 246, 0.1);
-    }
-
-    .result-item {
-      animation: slideIn 0.4s cubic-bezier(0.4, 0, 0.2, 1) forwards;
-      opacity: 0;
-      transform: translateY(10px);
-    }
-
-    @keyframes slideIn {
-      to {
-        opacity: 1;
-        transform: translateY(0);
-      }
-    }
-
-    .progress-bar {
-      background: linear-gradient(90deg,
-        #8b5cf6 0%,
-        #a855f7 25%,
-        #d946ef 50%,
-        #f472b6 75%,
-        #8b5cf6 100%
-      );
-      background-size: 200% 100%;
-      animation: shimmer 2s linear infinite;
+    /* Background effects */
+    .bg-noise {
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+      opacity: 0.03;
     }
 
     .orb {
       position: absolute;
       border-radius: 50%;
-      filter: blur(80px);
-      opacity: 0.5;
-      animation: float 8s ease-in-out infinite;
+      filter: blur(100px);
+      will-change: transform;
+      animation: float 20s ease-in-out infinite;
     }
 
     .orb-1 {
-      width: 400px;
-      height: 400px;
-      background: linear-gradient(135deg, #8b5cf6, #a855f7);
-      top: -100px;
-      left: -100px;
-      animation-delay: 0s;
+      width: min(500px, 80vw);
+      height: min(500px, 80vw);
+      background: linear-gradient(135deg, rgba(139, 92, 246, 0.4), rgba(167, 139, 250, 0.2));
+      top: -20%;
+      left: -20%;
     }
 
     .orb-2 {
-      width: 300px;
-      height: 300px;
-      background: linear-gradient(135deg, #d946ef, #f472b6);
-      bottom: -50px;
-      right: -50px;
-      animation-delay: -2s;
+      width: min(400px, 70vw);
+      height: min(400px, 70vw);
+      background: linear-gradient(135deg, rgba(236, 72, 153, 0.3), rgba(251, 146, 60, 0.2));
+      bottom: -10%;
+      right: -15%;
+      animation-delay: -7s;
     }
 
-    .orb-3 {
-      width: 200px;
-      height: 200px;
-      background: linear-gradient(135deg, #fb923c, #f472b6);
-      top: 50%;
-      right: 10%;
-      animation-delay: -4s;
+    /* Glass effects */
+    .glass {
+      background: rgba(255, 255, 255, 0.03);
+      backdrop-filter: blur(20px) saturate(180%);
+      -webkit-backdrop-filter: blur(20px) saturate(180%);
+      border: 1px solid rgba(255, 255, 255, 0.06);
     }
 
-    .spinner {
-      width: 40px;
-      height: 40px;
-      border: 3px solid rgba(139, 92, 246, 0.1);
-      border-top-color: #a855f7;
-      border-radius: 50%;
-      animation: spin-slow 1s linear infinite;
+    .glass-elevated {
+      background: rgba(255, 255, 255, 0.05);
+      backdrop-filter: blur(40px) saturate(200%);
+      -webkit-backdrop-filter: blur(40px) saturate(200%);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      box-shadow:
+        0 0 0 1px rgba(255, 255, 255, 0.05),
+        0 20px 25px -5px rgba(0, 0, 0, 0.3),
+        0 8px 10px -6px rgba(0, 0, 0, 0.2);
     }
 
-    .pulse-ring {
+    /* Gradient text */
+    .gradient-text {
+      background: linear-gradient(135deg, #c4b5fd 0%, #f9a8d4 40%, #fcd34d 100%);
+      -webkit-background-clip: text;
+      background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    /* Drop zone */
+    .drop-zone {
+      transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+      transform: translate3d(0, 0, 0);
+    }
+
+    .drop-zone:hover {
+      transform: translate3d(0, -4px, 0);
+      box-shadow:
+        0 0 0 1px rgba(139, 92, 246, 0.2),
+        0 25px 50px -12px rgba(139, 92, 246, 0.25);
+    }
+
+    .drop-zone.dragover {
+      transform: scale(1.02);
+      border-color: rgba(167, 139, 250, 0.6);
+      background: rgba(139, 92, 246, 0.08);
+      box-shadow:
+        0 0 0 4px rgba(167, 139, 250, 0.15),
+        0 30px 60px -15px rgba(139, 92, 246, 0.35);
+    }
+
+    /* Buttons */
+    .btn-primary {
+      background: linear-gradient(135deg, #7c3aed 0%, #a855f7 50%, #ec4899 100%);
+      background-size: 200% 200%;
+      transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+      box-shadow:
+        0 0 0 1px rgba(139, 92, 246, 0.5),
+        0 10px 40px -10px rgba(139, 92, 246, 0.5),
+        inset 0 1px 0 rgba(255, 255, 255, 0.1);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .btn-primary::before {
+      content: '';
       position: absolute;
       inset: 0;
-      border: 2px solid #a855f7;
-      border-radius: 50%;
-      animation: pulse-ring 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+      background: linear-gradient(135deg, transparent 0%, rgba(255,255,255,0.1) 50%, transparent 100%);
+      opacity: 0;
+      transition: opacity 0.3s;
     }
 
-    .feature-badge {
-      background: linear-gradient(135deg, rgba(139, 92, 246, 0.1), rgba(244, 114, 182, 0.1));
-      border: 1px solid rgba(139, 92, 246, 0.2);
+    .btn-primary:hover::before {
+      opacity: 1;
+    }
+
+    .btn-primary:hover {
+      transform: translate3d(0, -2px, 0);
+      box-shadow:
+        0 0 0 1px rgba(139, 92, 246, 0.6),
+        0 20px 50px -10px rgba(139, 92, 246, 0.6),
+        inset 0 1px 0 rgba(255, 255, 255, 0.15);
+    }
+
+    .btn-primary:active {
+      transform: translate3d(0, 0, 0) scale(0.98);
+    }
+
+    /* Touch-optimized button for mobile */
+    @media (hover: none) and (pointer: coarse) {
+      .btn-primary {
+        min-height: 56px;
+        font-size: 1.125rem;
+      }
+
+      .btn-primary:active {
+        transform: scale(0.97);
+        transition-duration: 0.1s;
+      }
+    }
+
+    .btn-success {
+      background: linear-gradient(135deg, #059669 0%, #10b981 50%, #34d399 100%);
+      background-size: 200% 200%;
+      transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+      box-shadow:
+        0 0 0 1px rgba(16, 185, 129, 0.5),
+        0 10px 40px -10px rgba(16, 185, 129, 0.4);
+    }
+
+    .btn-success:hover {
+      transform: translate3d(0, -1px, 0);
+      box-shadow:
+        0 0 0 1px rgba(16, 185, 129, 0.6),
+        0 15px 45px -10px rgba(16, 185, 129, 0.5);
+    }
+
+    /* File items */
+    .file-item {
+      animation: slide-up 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) backwards;
+      transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+      touch-action: pan-y;
+    }
+
+    .file-item:active {
+      transform: scale(0.98);
+    }
+
+    .file-item.swiping {
+      transition: none;
+    }
+
+    .file-item.removing {
+      animation: slide-out-right 0.3s ease-out forwards;
+    }
+
+    @keyframes slide-out-right {
+      to { opacity: 0; transform: translate3d(100%, 0, 0); }
+    }
+
+    /* Result items */
+    .result-item {
+      animation: slide-up 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) backwards;
+    }
+
+    /* Progress */
+    .progress-track {
+      background: rgba(255, 255, 255, 0.08);
+      box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.2);
+    }
+
+    .progress-fill {
+      background: linear-gradient(90deg, #7c3aed, #a855f7, #ec4899, #f472b6, #7c3aed);
+      background-size: 200% 100%;
+      animation: shimmer 2s linear infinite;
+      box-shadow: 0 0 20px rgba(139, 92, 246, 0.5);
+      transition: width 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+
+    /* Spinner */
+    .spinner {
+      width: 48px;
+      height: 48px;
+      border: 3px solid rgba(139, 92, 246, 0.15);
+      border-top-color: #a855f7;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
+
+    @media (max-width: 640px) {
+      .spinner {
+        width: 40px;
+        height: 40px;
+      }
+    }
+
+    /* Success check animation */
+    .check-circle {
+      stroke-dasharray: 166;
+      stroke-dashoffset: 166;
+      animation: check-draw 0.6s ease-out forwards;
+    }
+
+    .check-mark {
+      stroke-dasharray: 48;
+      stroke-dashoffset: 48;
+      animation: check-draw 0.4s ease-out 0.4s forwards;
+    }
+
+    /* Toast */
+    .toast {
+      animation: slide-up 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+      box-shadow:
+        0 0 0 1px rgba(255, 255, 255, 0.1),
+        0 20px 40px -10px rgba(0, 0, 0, 0.4);
+    }
+
+    /* Ripple effect */
+    .ripple {
+      position: absolute;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.3);
+      pointer-events: none;
+      animation: ripple 0.6s ease-out;
+    }
+
+    /* Touch feedback */
+    @media (hover: none) {
+      .touch-feedback {
+        position: relative;
+        overflow: hidden;
+      }
+    }
+
+    /* Mobile optimizations */
+    @media (max-width: 640px) {
+      .mobile-sheet {
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        max-height: 85vh;
+        border-radius: 24px 24px 0 0;
+        padding-bottom: calc(24px + var(--safe-bottom));
+        animation: slide-up 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+      }
+
+      .mobile-sheet::before {
+        content: '';
+        position: absolute;
+        top: 8px;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 36px;
+        height: 4px;
+        background: rgba(255, 255, 255, 0.2);
+        border-radius: 2px;
+      }
+    }
+
+    /* Hide scrollbar but keep functionality */
+    .hide-scrollbar {
+      -ms-overflow-style: none;
+      scrollbar-width: none;
+    }
+    .hide-scrollbar::-webkit-scrollbar {
+      display: none;
+    }
+
+    /* Custom scrollbar for desktop */
+    @media (hover: hover) {
+      ::-webkit-scrollbar {
+        width: 8px;
+        height: 8px;
+      }
+      ::-webkit-scrollbar-track {
+        background: rgba(255, 255, 255, 0.02);
+        border-radius: 4px;
+      }
+      ::-webkit-scrollbar-thumb {
+        background: rgba(139, 92, 246, 0.3);
+        border-radius: 4px;
+      }
+      ::-webkit-scrollbar-thumb:hover {
+        background: rgba(139, 92, 246, 0.5);
+      }
     }
 
     .hidden { display: none !important; }
 
-    /* Custom scrollbar */
-    ::-webkit-scrollbar {
-      width: 8px;
+    /* Focus states for accessibility */
+    .focus-ring:focus-visible {
+      outline: none;
+      box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.5);
     }
-    ::-webkit-scrollbar-track {
-      background: rgba(0, 0, 0, 0.1);
-      border-radius: 4px;
-    }
-    ::-webkit-scrollbar-thumb {
-      background: rgba(139, 92, 246, 0.3);
-      border-radius: 4px;
-    }
-    ::-webkit-scrollbar-thumb:hover {
-      background: rgba(139, 92, 246, 0.5);
+
+    /* Reduced motion */
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+      }
     }
   </style>
 </head>
 <body class="min-h-screen bg-[#0a0a0f] text-white overflow-x-hidden">
-  <!-- Animated background -->
-  <div class="fixed inset-0 bg-grid pointer-events-none"></div>
+  <!-- Background -->
   <div class="fixed inset-0 pointer-events-none overflow-hidden">
+    <div class="absolute inset-0 bg-noise"></div>
     <div class="orb orb-1"></div>
     <div class="orb orb-2"></div>
-    <div class="orb orb-3"></div>
   </div>
 
-  <div class="relative z-10 container mx-auto px-4 py-8 md:py-16 max-w-2xl">
-    <!-- Header -->
-    <header class="text-center mb-12 md:mb-16">
-      <div class="inline-flex items-center gap-2 px-4 py-2 rounded-full feature-badge mb-6">
-        <span class="w-2 h-2 bg-green-400 rounded-full animate-pulse"></span>
-        <span class="text-sm text-gray-300">100% Browser-Based</span>
-      </div>
+  <!-- Main content -->
+  <div class="relative z-10 min-h-screen flex flex-col">
+    <div class="flex-1 w-full max-w-xl mx-auto px-4 sm:px-6 pt-safe-top pb-6 sm:pb-12 flex flex-col">
 
-      <h1 class="text-4xl md:text-6xl font-extrabold mb-4 tracking-tight">
-        <span class="gradient-text">Suno2CD</span>
-      </h1>
-
-      <p class="text-lg md:text-xl text-gray-400 max-w-md mx-auto leading-relaxed">
-        Convert Suno AI audio to
-        <span class="text-white font-medium">CD quality</span>
-        <br class="hidden md:block">
-        <span class="text-gray-500">44.1kHz &bull; 16-bit &bull; WAV</span>
-      </p>
-    </header>
-
-    <main class="space-y-6">
-      <!-- Drop Zone -->
-      <div
-        id="dropZone"
-        class="drop-zone glass-strong rounded-3xl p-8 md:p-12 text-center cursor-pointer border-2 border-dashed border-gray-700/50 group"
-      >
-        <div class="drop-icon mb-6 relative inline-block">
-          <div class="w-20 h-20 md:w-24 md:h-24 rounded-2xl bg-gradient-to-br from-purple-500/20 to-pink-500/20 flex items-center justify-center mx-auto group-hover:scale-110 transition-transform duration-300">
-            <svg class="w-10 h-10 md:w-12 md:h-12 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3"/>
-            </svg>
-          </div>
+      <!-- Header -->
+      <header class="text-center pt-8 sm:pt-16 pb-8 sm:pb-12">
+        <div class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full glass text-xs sm:text-sm text-gray-300 mb-4 sm:mb-6">
+          <span class="w-1.5 h-1.5 sm:w-2 sm:h-2 bg-emerald-400 rounded-full animate-pulse"></span>
+          <span>100% Private &bull; Browser-Based</span>
         </div>
 
-        <p class="text-xl md:text-2xl font-semibold mb-2 text-white">Drop your audio files</p>
-        <p class="text-gray-500 mb-6">or click to browse</p>
+        <h1 class="text-3xl xs:text-4xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight mb-3 sm:mb-4">
+          <span class="gradient-text">Suno2CD</span>
+        </h1>
 
-        <div class="flex flex-wrap justify-center gap-2">
-          <span class="px-3 py-1 rounded-full text-xs font-medium bg-white/5 text-gray-400 border border-white/10">MP3</span>
-          <span class="px-3 py-1 rounded-full text-xs font-medium bg-white/5 text-gray-400 border border-white/10">WAV</span>
-          <span class="px-3 py-1 rounded-full text-xs font-medium bg-white/5 text-gray-400 border border-white/10">FLAC</span>
-          <span class="px-3 py-1 rounded-full text-xs font-medium bg-white/5 text-gray-400 border border-white/10">OGG</span>
-          <span class="px-3 py-1 rounded-full text-xs font-medium bg-white/5 text-gray-400 border border-white/10">M4A</span>
-        </div>
+        <p class="text-sm sm:text-base lg:text-lg text-gray-400 max-w-sm mx-auto leading-relaxed">
+          Convert Suno AI audio to <span class="text-white font-medium">CD quality</span>
+          <span class="hidden sm:inline"><br></span>
+          <span class="text-gray-500">44.1kHz &bull; 16-bit &bull; WAV</span>
+        </p>
+      </header>
 
-        <input type="file" id="fileInput" class="hidden" multiple accept="audio/*,.mp3,.wav,.flac,.ogg,.m4a">
-      </div>
+      <!-- Main area -->
+      <main class="flex-1 flex flex-col gap-4 sm:gap-6">
 
-      <!-- File List -->
-      <div id="fileList" class="hidden">
-        <div class="flex items-center justify-between mb-4">
-          <h2 class="text-sm font-semibold text-gray-400 uppercase tracking-wider flex items-center gap-2">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/>
-            </svg>
-            Files to Convert
-          </h2>
-          <span id="fileCount" class="text-sm text-gray-500"></span>
-        </div>
-        <div id="fileListItems" class="space-y-2"></div>
-      </div>
-
-      <!-- Convert Button -->
-      <button
-        id="convertBtn"
-        class="hidden w-full py-4 px-8 btn-primary rounded-2xl font-semibold text-lg flex items-center justify-center gap-3 group"
-      >
-        <svg class="w-5 h-5 group-hover:rotate-12 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
-        </svg>
-        <span>Convert to CD Quality</span>
-      </button>
-
-      <!-- Status -->
-      <div id="status" class="hidden">
-        <div class="glass-strong rounded-2xl p-6 md:p-8">
-          <div class="flex items-center gap-4 mb-6">
-            <div class="relative">
-              <div class="spinner"></div>
-              <div class="pulse-ring"></div>
-            </div>
-            <div>
-              <p id="statusText" class="font-medium text-white">Initializing...</p>
-              <p id="statusSubtext" class="text-sm text-gray-500">This may take a moment</p>
+        <!-- Drop Zone -->
+        <div
+          id="dropZone"
+          class="drop-zone glass-elevated rounded-2xl sm:rounded-3xl p-6 sm:p-10 lg:p-12 text-center cursor-pointer border border-dashed border-gray-700/50 focus-ring"
+          tabindex="0"
+          role="button"
+          aria-label="Drop audio files here or click to browse"
+        >
+          <div class="mb-4 sm:mb-6">
+            <div class="w-16 h-16 sm:w-20 sm:h-20 lg:w-24 lg:h-24 rounded-2xl bg-gradient-to-br from-violet-500/20 to-fuchsia-500/20 flex items-center justify-center mx-auto transition-transform duration-300 group-hover:scale-110">
+              <svg class="w-8 h-8 sm:w-10 sm:h-10 lg:w-12 lg:h-12 text-violet-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3"/>
+              </svg>
             </div>
           </div>
 
-          <div class="space-y-2">
-            <div class="flex justify-between text-sm">
-              <span class="text-gray-400">Progress</span>
-              <span id="progressPercent" class="font-mono text-purple-400">0%</span>
+          <p class="text-lg sm:text-xl lg:text-2xl font-semibold text-white mb-1 sm:mb-2">
+            Drop your audio files
+          </p>
+          <p class="text-sm sm:text-base text-gray-500 mb-4 sm:mb-6">
+            or tap to browse
+          </p>
+
+          <div class="flex flex-wrap justify-center gap-1.5 sm:gap-2">
+            <span class="px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-full text-xs font-medium bg-white/5 text-gray-400 border border-white/10">MP3</span>
+            <span class="px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-full text-xs font-medium bg-white/5 text-gray-400 border border-white/10">WAV</span>
+            <span class="px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-full text-xs font-medium bg-white/5 text-gray-400 border border-white/10">FLAC</span>
+            <span class="px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-full text-xs font-medium bg-white/5 text-gray-400 border border-white/10">OGG</span>
+            <span class="px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-full text-xs font-medium bg-white/5 text-gray-400 border border-white/10">M4A</span>
+          </div>
+
+          <input type="file" id="fileInput" class="hidden" multiple accept="audio/*,.mp3,.wav,.flac,.ogg,.m4a">
+        </div>
+
+        <!-- File List -->
+        <div id="fileList" class="hidden">
+          <div class="flex items-center justify-between mb-3 sm:mb-4 px-1">
+            <h2 class="text-xs sm:text-sm font-semibold text-gray-400 uppercase tracking-wider flex items-center gap-2">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/>
+              </svg>
+              <span>Files</span>
+            </h2>
+            <span id="fileCount" class="text-xs sm:text-sm text-gray-500 font-medium"></span>
+          </div>
+          <div id="fileListItems" class="space-y-2 sm:space-y-3 scroll-container hide-scrollbar max-h-[40vh] overflow-y-auto -mx-1 px-1"></div>
+        </div>
+
+        <!-- Convert Button (fixed at bottom on mobile) -->
+        <div id="convertBtnWrapper" class="hidden mt-auto sm:mt-0">
+          <div class="sm:hidden h-4"></div>
+          <button
+            id="convertBtn"
+            class="btn-primary w-full py-4 sm:py-5 px-6 rounded-2xl font-semibold text-base sm:text-lg flex items-center justify-center gap-3 focus-ring touch-feedback"
+          >
+            <svg class="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+            </svg>
+            <span>Convert to CD Quality</span>
+          </button>
+        </div>
+
+        <!-- Status -->
+        <div id="status" class="hidden">
+          <div class="glass-elevated rounded-2xl sm:rounded-3xl p-5 sm:p-8">
+            <div class="flex items-center gap-4 sm:gap-5 mb-6 sm:mb-8">
+              <div class="spinner flex-shrink-0"></div>
+              <div class="min-w-0 flex-1">
+                <p id="statusText" class="font-semibold text-base sm:text-lg text-white truncate">Initializing...</p>
+                <p id="statusSubtext" class="text-xs sm:text-sm text-gray-500 mt-0.5 truncate">Preparing audio engine</p>
+              </div>
+              <span id="progressPercent" class="text-lg sm:text-xl font-bold text-violet-400 tabular-nums flex-shrink-0">0%</span>
             </div>
-            <div class="h-2 bg-gray-800 rounded-full overflow-hidden">
-              <div id="progressFill" class="h-full progress-bar rounded-full transition-all duration-300 ease-out" style="width: 0%"></div>
+
+            <div class="progress-track h-2 sm:h-3 rounded-full overflow-hidden">
+              <div id="progressFill" class="progress-fill h-full rounded-full" style="width: 0%"></div>
             </div>
           </div>
         </div>
-      </div>
 
-      <!-- Results -->
-      <div id="results" class="hidden">
-        <div class="flex items-center gap-2 mb-4">
-          <div class="w-8 h-8 rounded-full bg-green-500/20 flex items-center justify-center">
-            <svg class="w-4 h-4 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
-            </svg>
+        <!-- Results -->
+        <div id="results" class="hidden">
+          <div class="flex items-center gap-2 sm:gap-3 mb-3 sm:mb-4 px-1">
+            <div class="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-emerald-500/20 flex items-center justify-center flex-shrink-0">
+              <svg class="w-4 h-4 sm:w-5 sm:h-5 text-emerald-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                <path class="check-mark" stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/>
+              </svg>
+            </div>
+            <h2 class="text-xs sm:text-sm font-semibold text-gray-400 uppercase tracking-wider">Converted</h2>
           </div>
-          <h2 class="text-sm font-semibold text-gray-400 uppercase tracking-wider">Converted Files</h2>
+          <div id="resultItems" class="space-y-2 sm:space-y-3 scroll-container hide-scrollbar max-h-[50vh] overflow-y-auto -mx-1 px-1"></div>
         </div>
-        <div id="resultItems" class="space-y-2"></div>
-      </div>
-    </main>
 
-    <!-- Footer -->
-    <footer class="mt-16 md:mt-24 text-center">
-      <div class="glass rounded-2xl p-6 inline-block">
-        <div class="flex items-center justify-center gap-6 text-sm text-gray-500">
-          <div class="flex items-center gap-2">
-            <svg class="w-4 h-4 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
+      </main>
+
+      <!-- Footer -->
+      <footer class="mt-8 sm:mt-12 lg:mt-16 text-center pb-safe-bottom">
+        <div class="glass rounded-xl sm:rounded-2xl py-3 sm:py-4 px-4 sm:px-6 inline-flex items-center gap-4 sm:gap-6 text-xs sm:text-sm text-gray-500">
+          <span class="flex items-center gap-1.5">
+            <svg class="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
             </svg>
-            <span>Private</span>
-          </div>
-          <div class="flex items-center gap-2">
-            <svg class="w-4 h-4 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+            Private
+          </span>
+          <span class="flex items-center gap-1.5">
+            <svg class="w-3.5 h-3.5 sm:w-4 sm:h-4 text-violet-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"/>
             </svg>
-            <span>Fast</span>
-          </div>
-          <div class="flex items-center gap-2">
-            <svg class="w-4 h-4 text-pink-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+            Fast
+          </span>
+          <span class="flex items-center gap-1.5">
+            <svg class="w-3.5 h-3.5 sm:w-4 sm:h-4 text-fuchsia-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"/>
             </svg>
-            <span>Free</span>
-          </div>
+            Free
+          </span>
         </div>
-      </div>
+        <p class="mt-4 text-[10px] sm:text-xs text-gray-600">
+          Powered by FFmpeg.wasm &bull; No data leaves your browser
+        </p>
+      </footer>
 
-      <p class="mt-6 text-xs text-gray-600">
-        Powered by FFmpeg.wasm &bull; No data leaves your browser
-      </p>
-    </footer>
+    </div>
   </div>
+
+  <!-- Toast container -->
+  <div id="toastContainer" class="fixed bottom-4 left-4 right-4 sm:bottom-6 sm:left-auto sm:right-6 sm:w-auto z-50 flex flex-col items-center sm:items-end gap-2 pointer-events-none" style="padding-bottom: var(--safe-bottom)"></div>
 
   <script type="module" src="/src/main.ts"></script>
 </body>
