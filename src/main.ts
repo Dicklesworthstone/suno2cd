@@ -469,7 +469,17 @@ function showResults(convertedFiles: ConversionResult[]) {
           zip.file(file.filename, file.blob);
         }
 
-        const zipBlob = await zip.generateAsync({ type: 'blob' });
+        // Generate ZIP with progress tracking
+        const zipBlob = await zip.generateAsync(
+          { type: 'blob' },
+          (metadata: { percent: number }) => {
+            const pct = Math.round(metadata.percent);
+            downloadZipBtn.innerHTML = `
+              <div class="spinner" style="width: 20px; height: 20px; border-width: 2px;"></div>
+              <span>Creating ZIP... ${pct}%</span>
+            `;
+          }
+        );
         const zipUrl = URL.createObjectURL(zipBlob);
 
         const a = document.createElement('a');
