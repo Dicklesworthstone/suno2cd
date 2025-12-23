@@ -1,4 +1,4 @@
-import { loadFFmpeg, convertToCDQuality, isAudioFile, ConversionResult, checkBrowserSupport, resetFilenameTracking, formatBytes } from './converter';
+import { loadFFmpeg, convertToCDQuality, isSupportedMediaFile, isVideoFile, ConversionResult, checkBrowserSupport, resetFilenameTracking, formatBytes } from './converter';
 
 // Declare JSZip on window (loaded from CDN)
 declare global {
@@ -118,25 +118,30 @@ fileInput.addEventListener('change', () => {
 });
 
 function addFiles(files: File[]) {
-  const audioFiles = files.filter(isAudioFile);
+  const mediaFiles = files.filter(isSupportedMediaFile);
 
-  if (audioFiles.length === 0 && files.length > 0) {
+  if (mediaFiles.length === 0 && files.length > 0) {
     haptic('error');
-    showToast('Please select audio files', 'error');
+    showToast('Please select audio or video files', 'error');
     return;
   }
 
   let added = 0;
-  for (const file of audioFiles) {
+  let videoCount = 0;
+  for (const file of mediaFiles) {
     if (!filesToConvert.some(f => f.name === file.name && f.size === file.size)) {
       filesToConvert.push(file);
       added++;
+      if (isVideoFile(file)) videoCount++;
     }
   }
 
   if (added > 0) {
     haptic('success');
-    showToast(`Added ${added} file${added > 1 ? 's' : ''}`);
+    const msg = videoCount > 0
+      ? `Added ${added} file${added > 1 ? 's' : ''} (audio will be extracted from video${videoCount > 1 ? 's' : ''})`
+      : `Added ${added} file${added > 1 ? 's' : ''}`;
+    showToast(msg);
   }
 
   renderFileList();
@@ -156,19 +161,32 @@ function renderFileList() {
   fileListItems.innerHTML = '';
 
   filesToConvert.forEach((file, index) => {
+    const isVideo = isVideoFile(file);
     const item = document.createElement('div');
     item.className = 'file-item glass rounded-xl sm:rounded-2xl px-3 sm:px-4 py-3 sm:py-4 flex items-center gap-3 sm:gap-4';
     item.style.animationDelay = `${index * 50}ms`;
     item.dataset.index = String(index);
+
+    // Different icons for audio vs video
+    const icon = isVideo
+      ? `<svg class="w-5 h-5 sm:w-6 sm:h-6 text-fuchsia-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 10.5l4.72-4.72a.75.75 0 011.28.53v11.38a.75.75 0 01-1.28.53l-4.72-4.72M4.5 18.75h9a2.25 2.25 0 002.25-2.25v-9a2.25 2.25 0 00-2.25-2.25h-9A2.25 2.25 0 002.25 7.5v9a2.25 2.25 0 002.25 2.25z"/>
+        </svg>`
+      : `<svg class="w-5 h-5 sm:w-6 sm:h-6 text-violet-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3"/>
+        </svg>`;
+
+    const subtitle = isVideo
+      ? `${formatBytes(file.size)} · extracting audio`
+      : formatBytes(file.size);
+
     item.innerHTML = `
       <div class="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-gradient-to-br from-violet-500/20 to-fuchsia-500/20 flex items-center justify-center flex-shrink-0">
-        <svg class="w-5 h-5 sm:w-6 sm:h-6 text-violet-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-          <path stroke-linecap="round" stroke-linejoin="round" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3"/>
-        </svg>
+        ${icon}
       </div>
       <div class="min-w-0 flex-1">
         <p class="text-sm sm:text-base font-medium text-white truncate">${escapeHtml(file.name)}</p>
-        <p class="text-xs sm:text-sm text-gray-500 mt-0.5">${formatBytes(file.size)}</p>
+        <p class="text-xs sm:text-sm text-gray-500 mt-0.5">${subtitle}</p>
       </div>
       <button class="remove-btn w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-white/5 hover:bg-red-500/20 active:bg-red-500/30 flex items-center justify-center transition-colors group flex-shrink-0 focus-ring" data-index="${index}" aria-label="Remove file">
         <svg class="w-4 h-4 sm:w-5 sm:h-5 text-gray-500 group-hover:text-red-400 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">

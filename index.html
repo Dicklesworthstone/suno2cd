@@ -48,6 +48,14 @@
   <link rel="stylesheet" href="https://rsms.me/inter/inter.css">
 
   <style>
+    /* Critical CSS - prevent flash of unstyled content */
+    html { background: #0a0a0f; }
+    body { opacity: 0; transition: opacity 0.15s ease-out; }
+    body.ready { opacity: 1; }
+
+    /* Fallback icon sizes before Tailwind loads */
+    svg { max-width: 100%; height: auto; }
+
     :root {
       --purple-glow: rgba(139, 92, 246, 0.15);
       --pink-glow: rgba(236, 72, 153, 0.12);
@@ -493,7 +501,7 @@
           </div>
 
           <p class="text-lg sm:text-xl lg:text-2xl font-semibold text-white mb-1 sm:mb-2">
-            Drop your audio files
+            Drop your audio or video files
           </p>
           <p class="text-sm sm:text-base text-gray-500 mb-4 sm:mb-6">
             or tap to browse
@@ -503,11 +511,12 @@
             <span class="px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-full text-xs font-medium bg-white/5 text-gray-400 border border-white/10">MP3</span>
             <span class="px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-full text-xs font-medium bg-white/5 text-gray-400 border border-white/10">WAV</span>
             <span class="px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-full text-xs font-medium bg-white/5 text-gray-400 border border-white/10">FLAC</span>
-            <span class="px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-full text-xs font-medium bg-white/5 text-gray-400 border border-white/10">OGG</span>
-            <span class="px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-full text-xs font-medium bg-white/5 text-gray-400 border border-white/10">M4A</span>
+            <span class="px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-full text-xs font-medium bg-white/5 text-gray-400 border border-white/10">MP4</span>
+            <span class="px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-full text-xs font-medium bg-white/5 text-gray-400 border border-white/10">MKV</span>
+            <span class="px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-full text-xs font-medium bg-white/5 text-gray-400 border border-white/10">+more</span>
           </div>
 
-          <input type="file" id="fileInput" class="hidden" multiple accept="audio/*,.mp3,.wav,.flac,.ogg,.m4a">
+          <input type="file" id="fileInput" class="hidden" multiple accept="audio/*,video/*,.mp3,.wav,.flac,.ogg,.m4a,.mp4,.mkv,.mov,.avi,.webm">
         </div>
 
         <!-- File List -->
@@ -603,6 +612,16 @@
 
   <!-- Toast container -->
   <div id="toastContainer" class="fixed bottom-4 left-4 right-4 sm:bottom-6 sm:left-auto sm:right-6 sm:w-auto z-50 flex flex-col items-center sm:items-end gap-2 pointer-events-none" style="padding-bottom: var(--safe-bottom)"></div>
+
+  <!-- Show content once CSS is ready -->
+  <script>
+    // Wait for Tailwind to process, then show content
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        document.body.classList.add('ready');
+      });
+    });
+  </script>
 
   <script type="module" src="/src/main.ts"></script>
 </body>

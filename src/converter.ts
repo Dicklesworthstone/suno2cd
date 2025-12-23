@@ -205,10 +205,24 @@ export async function convertToCDQuality(
   }
 }
 
+// Supported audio extensions
+const audioExtensions = ['.mp3', '.wav', '.flac', '.ogg', '.m4a', '.aac', '.wma', '.aiff'];
+
+// Supported video extensions (will extract audio)
+const videoExtensions = ['.mp4', '.mkv', '.mov', '.avi', '.webm', '.m4v', '.wmv'];
+
 export function isAudioFile(file: File): boolean {
-  const audioExtensions = ['.mp3', '.wav', '.flac', '.ogg', '.m4a', '.aac', '.wma', '.aiff'];
   const ext = file.name.toLowerCase().slice(file.name.lastIndexOf('.'));
   return file.type.startsWith('audio/') || audioExtensions.includes(ext);
+}
+
+export function isVideoFile(file: File): boolean {
+  const ext = file.name.toLowerCase().slice(file.name.lastIndexOf('.'));
+  return file.type.startsWith('video/') || videoExtensions.includes(ext);
+}
+
+export function isSupportedMediaFile(file: File): boolean {
+  return isAudioFile(file) || isVideoFile(file);
 }
 
 // Format bytes to human readable

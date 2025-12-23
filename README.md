@@ -27,11 +27,11 @@ Suno2CD converts your audio files to exact CD specifications **directly in your 
 
 ## How It Works
 
-1. **Drop your audio files** (MP3, WAV, FLAC, OGG, or M4A)
+1. **Drop your files** (audio or video - MP3, WAV, FLAC, MP4, MKV, and more)
 2. **Click "Convert to CD Quality"**
 3. **Download** your CD-ready WAV files
 
-That's it. The conversion uses FFmpeg compiled to WebAssembly, running entirely in your browser.
+That's it. For video files, the audio track is automatically extracted. The conversion uses FFmpeg compiled to WebAssembly, running entirely in your browser.
 
 ## Technical Details
 
