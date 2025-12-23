@@ -1,0 +1,19 @@
+{
+  "name": "suno2cd",
+  "version": "1.0.0",
+  "description": "Convert Suno AI audio files to CD quality (44.1kHz 16-bit WAV)",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.2",
+    "vite": "^6.0.3"
+  },
+  "dependencies": {
+    "@ffmpeg/ffmpeg": "^0.12.10",
+    "@ffmpeg/util": "^0.12.1"
+  }
+}
