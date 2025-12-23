@@ -54,19 +54,41 @@ function haptic(type: 'light' | 'medium' | 'heavy' | 'success' | 'error' = 'ligh
 // Check browser support on load
 const support = checkBrowserSupport();
 if (!support.supported) {
-  dropZone.innerHTML = `
-    <div class="text-center py-8">
-      <div class="w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-red-500/20 flex items-center justify-center mx-auto mb-4">
-        <svg class="w-7 h-7 sm:w-8 sm:h-8 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
-          <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
-        </svg>
+  if (support.needsReload) {
+    // Service worker is loading - show loading state and wait
+    dropZone.innerHTML = `
+      <div class="text-center py-8">
+        <div class="spinner mx-auto mb-4" style="width: 48px; height: 48px;"></div>
+        <h3 class="text-lg sm:text-xl font-semibold text-white mb-2">Preparing...</h3>
+        <p class="text-sm sm:text-base text-gray-400 max-w-sm mx-auto leading-relaxed">${support.message}</p>
+        <button onclick="location.reload()" class="mt-4 px-4 py-2 text-sm font-medium text-violet-400 hover:text-violet-300 transition-colors">
+          Click to refresh
+        </button>
       </div>
-      <h3 class="text-lg sm:text-xl font-semibold text-white mb-2">Browser Not Supported</h3>
-      <p class="text-sm sm:text-base text-gray-400 max-w-sm mx-auto leading-relaxed">${support.message}</p>
-    </div>
-  `;
-  dropZone.classList.remove('cursor-pointer');
-  dropZone.style.pointerEvents = 'none';
+    `;
+    dropZone.classList.remove('cursor-pointer');
+    // Auto-refresh after a short delay if still not supported
+    setTimeout(() => {
+      const recheck = checkBrowserSupport();
+      if (!recheck.supported) {
+        location.reload();
+      }
+    }, 2000);
+  } else {
+    dropZone.innerHTML = `
+      <div class="text-center py-8">
+        <div class="w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-red-500/20 flex items-center justify-center mx-auto mb-4">
+          <svg class="w-7 h-7 sm:w-8 sm:h-8 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+          </svg>
+        </div>
+        <h3 class="text-lg sm:text-xl font-semibold text-white mb-2">Browser Not Supported</h3>
+        <p class="text-sm sm:text-base text-gray-400 max-w-sm mx-auto leading-relaxed">${support.message}</p>
+      </div>
+    `;
+    dropZone.classList.remove('cursor-pointer');
+    dropZone.style.pointerEvents = 'none';
+  }
 }
 
 // Drop zone interactions

@@ -7,20 +7,42 @@ let fileCounter = 0;
 
 export type ProgressCallback = (progress: number, message: string) => void;
 
-export function checkBrowserSupport(): { supported: boolean; message: string } {
-  if (typeof SharedArrayBuffer === 'undefined') {
-    return {
-      supported: false,
-      message: 'Your browser does not support SharedArrayBuffer. Please use a modern browser like Chrome, Firefox, or Edge.',
-    };
-  }
+export function checkBrowserSupport(): { supported: boolean; message: string; needsReload?: boolean } {
   if (typeof WebAssembly === 'undefined') {
     return {
       supported: false,
       message: 'Your browser does not support WebAssembly. Please use a modern browser.',
     };
   }
-  return { supported: true, message: '' };
+
+  // Check if we're cross-origin isolated (required for SharedArrayBuffer)
+  if (typeof crossOriginIsolated !== 'undefined' && crossOriginIsolated) {
+    return { supported: true, message: '' };
+  }
+
+  // Check if SharedArrayBuffer is available directly (some contexts)
+  if (typeof SharedArrayBuffer !== 'undefined') {
+    return { supported: true, message: '' };
+  }
+
+  // Service worker may be loading - will auto-reload when ready
+  // Check if we're on a localhost or file:// where it might work differently
+  const isLocalhost = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
+  const isFile = location.protocol === 'file:';
+
+  if (isLocalhost || isFile) {
+    return {
+      supported: false,
+      message: 'SharedArrayBuffer requires specific server headers. Try running with: npx vite --host',
+    };
+  }
+
+  // coi-serviceworker should auto-reload - give it a moment
+  return {
+    supported: false,
+    needsReload: true,
+    message: 'Preparing secure context... If this persists, please refresh the page.',
+  };
 }
 
 export async function loadFFmpeg(onProgress?: ProgressCallback): Promise<void> {
