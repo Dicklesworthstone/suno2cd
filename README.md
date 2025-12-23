@@ -45,8 +45,10 @@ That's it. The conversion uses FFmpeg compiled to WebAssembly, running entirely 
 
 ### Browser Requirements
 - Modern browser with WebAssembly support
-- SharedArrayBuffer support (Chrome, Firefox, Edge)
-- ~30MB download for FFmpeg core (cached after first use)
+- Works on **all devices** including iOS Safari
+- Multi-threaded mode on desktop (Chrome, Firefox, Edge) for faster conversion
+- Single-threaded fallback for iOS and other browsers
+- ~31MB download for FFmpeg core (cached after first use)
 
 ### Privacy
 Your audio files **never leave your device**. All processing is performed locally using FFmpeg.wasm. There are no servers, no uploads, no tracking.
@@ -54,20 +56,19 @@ Your audio files **never leave your device**. All processing is performed locall
 ## Development
 
 ### Prerequisites
-- Node.js 18+
-- npm
+- [Bun](https://bun.sh) (recommended) or Node.js 18+
 
 ### Setup
 ```bash
 git clone https://github.com/Dicklesworthstone/suno2cd.git
 cd suno2cd
-npm install
-npm run dev
+bun install
+bun run dev
 ```
 
 ### Build
 ```bash
-npm run build
+bun run build
 ```
 
 ### Tech Stack
@@ -83,7 +84,7 @@ The app auto-deploys to GitHub Pages on push to `main`. See `.github/workflows/d
 
 To deploy manually:
 ```bash
-npm run build
+bun run build
 # Upload contents of `dist/` to any static host
 ```
 
