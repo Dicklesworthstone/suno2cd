@@ -12,7 +12,8 @@
   <!-- Favicons -->
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎵</text></svg>">
 
-  <!-- Service worker for COOP/COEP headers (must be same-origin) -->
+  <!-- Service worker for COOP/COEP headers - enables multi-threaded FFmpeg on supported browsers -->
+  <!-- Falls back gracefully to single-threaded on iOS/browsers without SharedArrayBuffer support -->
   <script src="./coi-serviceworker.js"></script>
 
   <!-- JSZip for "Download All as ZIP" feature -->

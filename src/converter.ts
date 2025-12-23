@@ -7,7 +7,8 @@ let fileCounter = 0;
 
 export type ProgressCallback = (progress: number, message: string) => void;
 
-export function checkBrowserSupport(): { supported: boolean; message: string; needsReload?: boolean } {
+export function checkBrowserSupport(): { supported: boolean; message: string } {
+  // Only check for WebAssembly - we have fallbacks for everything else
   if (typeof WebAssembly === 'undefined') {
     return {
       supported: false,
@@ -15,33 +16,20 @@ export function checkBrowserSupport(): { supported: boolean; message: string; ne
     };
   }
 
-  // Check if we're cross-origin isolated (required for SharedArrayBuffer)
+  return { supported: true, message: '' };
+}
+
+// Check if we can use multi-threaded FFmpeg (faster but requires SharedArrayBuffer)
+function canUseMultiThreaded(): boolean {
+  // Check for cross-origin isolation (required for SharedArrayBuffer)
   if (typeof crossOriginIsolated !== 'undefined' && crossOriginIsolated) {
-    return { supported: true, message: '' };
+    return true;
   }
-
-  // Check if SharedArrayBuffer is available directly (some contexts)
+  // Some contexts have SharedArrayBuffer without crossOriginIsolated flag
   if (typeof SharedArrayBuffer !== 'undefined') {
-    return { supported: true, message: '' };
+    return true;
   }
-
-  // Service worker may be loading - will auto-reload when ready
-  const isLocalhost = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
-  const isFile = location.protocol === 'file:';
-
-  if (isLocalhost || isFile) {
-    return {
-      supported: false,
-      message: 'SharedArrayBuffer requires specific server headers. Try running with: bunx vite --host',
-    };
-  }
-
-  // coi-serviceworker should auto-reload - give it a moment
-  return {
-    supported: false,
-    needsReload: true,
-    message: 'Preparing secure context... If this persists, please refresh the page.',
-  };
+  return false;
 }
 
 export async function loadFFmpeg(onProgress?: ProgressCallback): Promise<void> {
@@ -58,10 +46,14 @@ export async function loadFFmpeg(onProgress?: ProgressCallback): Promise<void> {
     console.log('[FFmpeg]', message);
   });
 
-  onProgress?.(0, 'Downloading FFmpeg (~31 MB)...');
+  // Use multi-threaded version if SharedArrayBuffer is available (faster)
+  // Fall back to single-threaded for iOS and other browsers without SharedArrayBuffer
+  const useMultiThreaded = canUseMultiThreaded();
+  const corePackage = useMultiThreaded ? '@ffmpeg/core-mt@0.12.6' : '@ffmpeg/core@0.12.6';
+  const baseURL = `https://cdn.jsdelivr.net/npm/${corePackage}/dist/esm`;
 
-  // Use jsDelivr (faster/more reliable than unpkg) with version matching @ffmpeg/ffmpeg
-  const baseURL = 'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.10/dist/esm';
+  const mode = useMultiThreaded ? 'multi-threaded (faster)' : 'single-threaded';
+  onProgress?.(0, `Downloading FFmpeg ${mode}...`);
 
   // Download core JS file
   onProgress?.(10, 'Downloading FFmpeg core...');
@@ -70,22 +62,34 @@ export async function loadFFmpeg(onProgress?: ProgressCallback): Promise<void> {
     'text/javascript'
   );
 
-  // Download WASM file (the large one)
-  onProgress?.(30, 'Downloading FFmpeg WASM (~31 MB)...');
+  // Download WASM file (the large one ~31MB for single-threaded, ~32MB for multi-threaded)
+  onProgress?.(30, 'Downloading FFmpeg WASM...');
   const wasmURL = await toBlobURL(
     `${baseURL}/ffmpeg-core.wasm`,
     'application/wasm'
   );
+
+  // Multi-threaded version also needs the worker file
+  let workerURL: string | undefined;
+  if (useMultiThreaded) {
+    onProgress?.(80, 'Downloading FFmpeg worker...');
+    workerURL = await toBlobURL(
+      `${baseURL}/ffmpeg-core.worker.js`,
+      'text/javascript'
+    );
+  }
 
   onProgress?.(100, 'Initializing FFmpeg...');
 
   await ffmpeg.load({
     coreURL,
     wasmURL,
+    ...(workerURL && { workerURL }),
   });
 
   loaded = true;
-  onProgress?.(100, 'FFmpeg ready');
+  const readyMsg = useMultiThreaded ? 'FFmpeg ready (multi-threaded)' : 'FFmpeg ready';
+  onProgress?.(100, readyMsg);
 }
 
 export interface ConversionResult {
