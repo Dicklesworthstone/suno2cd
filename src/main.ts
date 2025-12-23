@@ -61,28 +61,56 @@ function haptic(type: 'light' | 'medium' | 'heavy' | 'success' | 'error' = 'ligh
 
 // Check browser support on load
 const support = checkBrowserSupport();
+
+// Detect iOS Safari (doesn't support SharedArrayBuffer via service worker)
+const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+  (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+
 if (!support.supported) {
-  if (support.needsReload) {
-    // Service worker is loading - show loading state and wait
+  // Track reload attempts to prevent infinite loops
+  const reloadKey = 'suno2cd_reload_attempts';
+  const reloadAttempts = parseInt(sessionStorage.getItem(reloadKey) || '0', 10);
+  const maxReloads = 2;
+
+  if (isIOS) {
+    // iOS Safari doesn't support SharedArrayBuffer via service worker
+    dropZone.innerHTML = `
+      <div class="text-center py-8">
+        <div class="w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-amber-500/20 flex items-center justify-center mx-auto mb-4">
+          <svg class="w-7 h-7 sm:w-8 sm:h-8 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+          </svg>
+        </div>
+        <h3 class="text-lg sm:text-xl font-semibold text-white mb-2">iOS Not Supported</h3>
+        <p class="text-sm sm:text-base text-gray-400 max-w-sm mx-auto leading-relaxed">
+          iOS Safari doesn't support the required features for in-browser audio conversion.
+          Please use a desktop browser (Chrome, Firefox, or Edge).
+        </p>
+      </div>
+    `;
+    dropZone.classList.remove('cursor-pointer');
+    dropZone.style.pointerEvents = 'none';
+  } else if (support.needsReload && reloadAttempts < maxReloads) {
+    // Service worker is loading - show loading state and auto-reload (limited attempts)
+    sessionStorage.setItem(reloadKey, String(reloadAttempts + 1));
     dropZone.innerHTML = `
       <div class="text-center py-8">
         <div class="spinner mx-auto mb-4" style="width: 48px; height: 48px;"></div>
         <h3 class="text-lg sm:text-xl font-semibold text-white mb-2">Preparing...</h3>
         <p class="text-sm sm:text-base text-gray-400 max-w-sm mx-auto leading-relaxed">${support.message}</p>
-        <button onclick="location.reload()" class="mt-4 px-4 py-2 text-sm font-medium text-violet-400 hover:text-violet-300 transition-colors">
-          Click to refresh
-        </button>
       </div>
     `;
     dropZone.classList.remove('cursor-pointer');
-    // Auto-refresh after a short delay if still not supported
+    // Let coi-serviceworker handle the reload, but fallback after delay
     setTimeout(() => {
       const recheck = checkBrowserSupport();
       if (!recheck.supported) {
         location.reload();
       }
-    }, 2000);
+    }, 3000);
   } else {
+    // Max reloads reached or not a reload scenario - show error
+    sessionStorage.removeItem(reloadKey);
     dropZone.innerHTML = `
       <div class="text-center py-8">
         <div class="w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-red-500/20 flex items-center justify-center mx-auto mb-4">
@@ -91,12 +119,20 @@ if (!support.supported) {
           </svg>
         </div>
         <h3 class="text-lg sm:text-xl font-semibold text-white mb-2">Browser Not Supported</h3>
-        <p class="text-sm sm:text-base text-gray-400 max-w-sm mx-auto leading-relaxed">${support.message}</p>
+        <p class="text-sm sm:text-base text-gray-400 max-w-sm mx-auto leading-relaxed">
+          ${support.message || 'This browser does not support the required features. Please use Chrome, Firefox, or Edge on desktop.'}
+        </p>
+        <button onclick="sessionStorage.clear(); location.reload()" class="mt-4 px-4 py-2 text-sm font-medium text-violet-400 hover:text-violet-300 transition-colors">
+          Try again
+        </button>
       </div>
     `;
     dropZone.classList.remove('cursor-pointer');
     dropZone.style.pointerEvents = 'none';
   }
+} else {
+  // Supported - clear any reload tracking
+  sessionStorage.removeItem('suno2cd_reload_attempts');
 }
 
 // Drop zone interactions
