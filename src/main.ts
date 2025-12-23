@@ -318,15 +318,18 @@ function handleTouchEnd() {
 function removeFile(index: number, element?: HTMLElement) {
   haptic('light');
 
+  // Remove from array immediately to avoid race condition with rapid deletes
+  // (indices become stale if we wait for animation)
+  filesToConvert.splice(index, 1);
+
   const el = element || fileListItems.querySelector(`[data-index="${index}"]`) as HTMLElement;
   if (el) {
-    el.classList.add('removing');
-    el.addEventListener('animationend', () => {
-      filesToConvert.splice(index, 1);
-      renderFileList();
-    }, { once: true });
+    // Quick fade-out animation
+    el.style.opacity = '0';
+    el.style.transform = 'translateX(-20px)';
+    el.style.transition = 'all 0.15s ease-out';
+    setTimeout(() => renderFileList(), 150);
   } else {
-    filesToConvert.splice(index, 1);
     renderFileList();
   }
 }

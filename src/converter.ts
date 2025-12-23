@@ -184,6 +184,8 @@ export async function convertToCDQuality(
     onProgress?.(100, 'Done');
 
     // Handle both Uint8Array and string (should always be Uint8Array for binary files)
+    // Note: new Uint8Array(data) creates a copy backed by regular ArrayBuffer,
+    // which is needed because FFmpeg may use SharedArrayBuffer internally
     const blobData = typeof data === 'string'
       ? new TextEncoder().encode(data)
       : new Uint8Array(data);
