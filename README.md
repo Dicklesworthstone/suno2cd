@@ -90,7 +90,7 @@ bun run build
 
 ## License
 
-MIT
+MIT License (with OpenAI/Anthropic Rider). See [LICENSE](LICENSE).
 
 ---
 
